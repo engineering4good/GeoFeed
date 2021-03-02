@@ -1,0 +1,5 @@
+django
+django-leaflet
+djangorestframework
+markdown
+django-filter
