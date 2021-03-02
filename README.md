@@ -1,7 +1,7 @@
 ## GeoFeed
 geo-social networking service
 
-**For [demonstration]((https://qrfeedcavava7669boersycom.pythonanywhere.com/)) purpose secrets are NOT secret**
+**For [demonstration](https://qrfeedcavava7669boersycom.pythonanywhere.com/) purpose secrets are NOT secret**
 - location based communication
 - no registration
 - reactive UI
