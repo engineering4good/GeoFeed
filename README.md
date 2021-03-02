@@ -1,4 +1,4 @@
-##GeoFeed
+## GeoFeed
 geo-social networking service
 
 **For [demonstration]((https://qrfeedcavava7669boersycom.pythonanywhere.com/)) purpose secrets are NOT secret**
