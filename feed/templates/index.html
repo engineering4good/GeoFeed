@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block scripts %}
+	<script src="{% static '/feed/qrcode.min.js' %}" type="text/javascript"></script>
+    <script src="{% static '/feed/leaflet.js' %}" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+    <script src="{% static '/feed/leaflet-gesture-handling.min.js' %}" type="text/javascript"></script>
+	<script type="text/javascript">
+		function map_init_basic (id) {
+			map = L.map(id).setView({{default_location}}, {{default_location_scale}});
+			L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			}).addTo(map);
+            map.gestureHandling.enable();
+            
+            {% for feed in latest_feeds_list %}
+                marker = L.marker([{{ feed.latitude }}, {{ feed.longitude }}]).addTo(map);
+                popup_text = '<a href="{% url 'feed:feed.public' feed.latitude feed.longitude %}"><div class="feed_title" style="display: inline-block;">{{ feed.title }}</div></a>';
+                marker.bindPopup(popup_text)
+            {% endfor%}
+            map.setView(marker.getLatLng(), {{ default_location_scale }});
+        }
+	</script>
+{% endblock %}
+
+{% block style %}
+    <link rel="stylesheet" href="{% static '/feed/leaflet.css' %}" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+	<link rel="stylesheet" href="{% static '/feed/leaflet-gesture-handling.min.css' %}" type="text/css">
+
+	<style type="text/css">
+		#index_map {
+		    height: 180px;
+			min-height: 60vh;
+		}
+		#qrcode {
+			max-width : min(90vw, 90vh);
+            min-width: 30vw;
+		}
+	</style>
+{% endblock %}
+
+{% block content %}
+	<div class="mui-container-fluid">
+		<div class="mui-row">
+			<div id="left_col" class="mui-col-md-8">
+        		<div class="mui--text-display3">Let places to talk!</div>
+				<div class="mui--text-dark mui--text-subhead">Let your favorite places become a forum, doesn't matter when you visit it. </div>
+				<div id="map">
+                    <div id="index_map"></div>
+					<script type="text/javascript">
+						map_init_basic('index_map');
+					</script>
+				</div>
+			</div>
+			<div id="right_col" class="mui-col-md-4">
+				<div class="mui--text-dark mui--text-subhead">Create new feed and stiсk this QR secret in the real world location.</div>
+				<form id="newFeedCreation" class="mui-form--inline">
+					<div class="mui-textfield">
+						<label>Your feed secret:</label>
+						<input id="newFeedIdInput" type="text" placeholder="New feed secret" maxlength="64" style="text-align: center;">
+					</div>
+					<button class="mui-btn mui-btn--primary">Create</button>
+				</form>
+				<a id="newFeedLink" href="">
+					<div id="qrcode" style="display: inline-block;"></div>
+				</a>
+				<script type="text/javascript">
+					function newFeedIdChanged() {
+						var newFeedId = document.getElementById("newFeedIdInput").value;
+						var newFeedURLRel = "{% url 'feed:feed' feed_secret='feed_secret' %}"
+							  .replace(/feed_secret/, newFeedId);
+						var newFeedURLAbs = document.location.host + newFeedURLRel;
+						var qrcode = new QRCode({
+							content: newFeedURLAbs,
+							container: "svg-viewbox", //Responsive use
+							join: true //Crisp rendering and 4-5x reduced file size
+						});
+						var svg = qrcode.svg();
+						document.getElementById("qrcode").innerHTML = svg;
+						document.getElementById("newFeedLink").href = newFeedURLRel;
+					}
+					var newFeedId = (Math.random()*1e32).toString(36).split('.').join("");
+					document.getElementById("newFeedIdInput").oninput = newFeedIdChanged;
+					document.getElementById("newFeedIdInput").value = newFeedId;
+					document.getElementById("newFeedCreation").addEventListener("submit", function(e){
+						e.preventDefault();
+						e.stopPropagation();
+						window.location.href = document.getElementById("newFeedLink").href;
+						return false;
+					}, false);
+					newFeedIdChanged();
+				</script>
+			</div>
+		</div>
+
+		<div class="height_sep"></div>
+		<div style="display: block;">
+			<div class="mui--text-display1">Last feeds</div>
+			{% if latest_feeds_list %}
+			    <div class="feed_index">
+			    {% for feed in latest_feeds_list %}
+			        <div class="feed">
+						<a href="{% url 'feed:feed.public' feed.latitude feed.longitude %}">
+							<div class="feed_title" style="display: inline-block;">{{ feed.title }}</div>
+						</a>
+						<a href="{% url 'feed:feed' feed.feed_secret %}">
+			        		<div class="feed_secret" style="display: inline-block;">[secret: {{ feed.feed_secret }}]</div>
+				        </a>
+			        </div>
+			        <div class="feed_sep"></div>
+			    {% endfor %}
+			    </div>
+			{% else %}
+			    <p>No feeds are available.</p>
+			{% endif %}
+		</div>
+	</div>
+{% endblock %}

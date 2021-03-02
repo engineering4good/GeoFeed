@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+
+{% block style %}
+    <link rel="stylesheet" href="{% static '/feed/leaflet.css' %}" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+	<link rel="stylesheet" href="{% static '/feed/leaflet-gesture-handling.min.css' %}" type="text/css">
+
+	<style type="text/css">
+		#index_map {
+		    height: 180px;
+		    min-height: 60vh;
+        }
+		#qrcode {
+			max-width : min(90vw, 90vh);
+            min-width: 30vw;
+		}
+	</style>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static '/feed/vue.js' %}" type="text/javascript"></script>
+	<script src="{% static '/feed/vue-i18n.min.js' %}"></script>
+	<script src="{% static '/feed/lang/'|add:locale|add:'/strings.js' %}"></script>
+	<script src="{% static '/feed/lang/en_us/strings.js' %}"></script>
+    <script src="{% static '/feed/qrcode.min.js' %}" type="text/javascript"></script>
+    <script src="{% static '/feed/leaflet.js' %}" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+    <script src="{% static '/feed/leaflet-gesture-handling.min.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block logotitle %}<a href="{% url 'feed:index' %}" class="white">[[ $t("title.name") ]]</a>{% endblock %}
+
+{% block content %}
+	<div class="mui-container-fluid">
+		<div class="mui-row">
+			<div id="left_col" class="mui-col-md-8">
+        		<div class="mui--text-display3">[[ $t("description.title")]]</div>
+				<div class="mui--text-dark mui--text-title">[[ $t("description.text")]]</div>
+				<div id="map">
+                    <div id="index_map"></div>
+				</div>
+			</div>
+            <div id="right_col" class="mui-col-md-4">
+				<div class="mui--text-dark mui--text-title">[[ $t("creation.use_description") ]]</div>
+				<div class="mui-form--inline">
+					<div class="mui-textfield">
+						<label>[[ $t("creation.your_secret") ]]:</label>
+						<input id="newFeedIdInput" type="text" :placeholder="$t('creation.new_feed_secret')" v-model="current_feed_secret" maxlength="64" style="text-align: center;">
+					</div>
+					<a id="newFeedLink" :href="render_feed_private_url(current_feed_secret)">
+						<button class="mui-btn mui-btn--primary">[[ $t("creation.create") ]]</button>
+					</a>
+				</div>
+				<a :href="render_feed_private_url(current_feed_secret)">
+					<div id="qrcode" style="display: inline-block;" v-html="current_feed_secret_qr"></div>
+				</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block footer %}
+		<div class="height_sep"></div>
+		<div class="mui-container mui--text-center">
+            <a href="{% url 'feed:index' %}">[[ $t("title.name") ]]</a> [[ $t("footer.description") ]]
+		</div>
+{% endblock %}
+
+{% block end%}
+<script type="text/javascript">
+	const i18n_strings = {
+		en_us: typeof en_us_strings === "undefined" ? null : en_us_strings,
+		ru_ru: typeof ru_ru_strings === "undefined" ? null : ru_ru_strings,
+	}
+	const i18n = new VueI18n({
+		locale: '{{locale}}',
+		fallbackLocale: 'en_us',
+		messages: i18n_strings,
+	});
+    const app = new Vue({
+        el: '#root',
+        delimiters: ['[[', ']]'],
+        i18n,
+        data: {
+            current_feed_secret: (Math.random()*1e32).toString(36).split('.').join(""),
+            feeds: [],
+            markers: [],
+            map: null,
+        },
+        computed: {
+            current_feed_secret_qr: function () {
+                return this.render_qr_svg(this.rel_to_abs_url(this.render_feed_private_url(this.current_feed_secret)));
+            },
+        },
+        methods: {
+            get_feeds() {
+                fetch("/api/feeds/", {
+                    "method": "GET",
+                    "headers": {}
+                })
+                .then(response => {
+                    if(response.ok){
+                        return response.json()
+                    } else{
+                        alert("Server returned " + response.status + " : " + response.statusText);
+                    }
+                })
+                .then(response => {
+                    this.feeds = response;
+                })
+                .catch(err => {
+                    console.log(err);
+                });
+            },
+            render_feed_public_url(latitude, longitude) {
+                var url_pattern = "{% url 'feed:feed.public' 'feed_latitude' 'feed_longitude' %}"
+                var url = url_pattern
+                    .replace("feed_latitude", latitude)
+                    .replace("feed_longitude", longitude);
+                return url;
+            },
+            render_feed_private_url(secret) {
+                var url_pattern = "{% url 'feed:feed' 'feed_secret' %}"
+                var url = url_pattern.replace("feed_secret", secret);
+                return url;
+            },
+            rel_to_abs_url(relative_url){
+            	return document.location.host + relative_url;
+            },
+            render_qr_svg(data) {
+                var qr_code = new QRCode({
+                                content: data,
+                                container: "svg-viewbox", //Responsive use
+                                join: true //Crisp rendering and 4-5x reduced file size
+                            });
+                return qr_code.svg();
+            },
+        },
+        created: function() {
+            this.get_feeds();
+        },
+        mounted:function() {
+        	// map init
+            var map_object = L.map('index_map').setView({{default_location}}, {{default_location_scale}});
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            }).addTo(map_object);
+            map_object.gestureHandling.enable();
+            this.map = map_object;
+
+			// new feed input init
+			document.getElementById("newFeedIdInput").addEventListener("keyup", function(event) {
+				if (event.keyCode === 13) {
+					event.preventDefault();
+					document.getElementById("newFeedLink").click();
+				}
+			});
+        },
+        watch: {
+            feeds: function (newFeeds, oldFeeds) {
+                for (feed of newFeeds) {
+                    if (!oldFeeds.includes(feed)) {
+                        var marker = L.marker([feed.latitude , feed.longitude]);
+                        var public_html = '<a href="' + this.render_feed_public_url(feed.latitude, feed.longitude) + '"><div class="feed_title" style="display: inline-block;">' + feed.title + '</div></a>';
+                        var secret_html = '<a href="' + this.render_feed_private_url(feed.feed_secret) + '"><div class="feed_title" style="display: inline-block;">secret: ' + feed.feed_secret + '</div></a>';
+                        var popup_html = public_html + '<br/>' + secret_html;
+                        marker.bindPopup(popup_html);
+                        marker.addTo(this.map);
+                        this.markers.push(marker);
+                    } else {
+                    // TODO remove marker
+                    }
+                }
+            },
+        },
+    });
+</script>
+{% endblock %}

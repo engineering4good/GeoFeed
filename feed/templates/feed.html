@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block scripts %}
+    <script src="{% static '/feed/qrcode.min.js' %}" type="text/javascript"></script>
+
+    <script src="{% static '/feed/leaflet.js' %}" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+    <script src="{% static '/feed/leaflet-gesture-handling.min.js' %}" type="text/javascript"></script>
+    <script type="text/javascript">
+        var map;
+        var marker;
+        function map_update_location() {
+            try {
+                var id_input = document.getElementById("new_message_feed_secret");
+                var lat_input = document.getElementById("new_message_feed_lat");
+                var lng_input = document.getElementById("new_message_feed_lng");
+                var scale_input = document.getElementById("new_message_feed_scale");
+                var new_lat = Number(marker.getLatLng()["lat"]).toFixed(5);
+                var new_lng = Number(marker.getLatLng()["lng"]).toFixed(5);
+                var new_scale = Number(map.getZoom());
+                if (id_input.value.localeCompare(lat_input.value + ','
+                                                 + lng_input.value  + ','
+                                                 + scale_input.value) === 0) {
+                    id_input.value = new_lat + ',' + new_lng  + ',' + new_scale;
+                    history.pushState({}, null, document.location.origin + '/' + id_input.value);
+                    document.getElementById("feed_secret_title").innerHTML = id_input.value;
+                    updateQrCode();
+                }
+                lat_input.value = new_lat;
+                lng_input.value = new_lng;
+                scale_input.value = new_scale;
+            }
+            catch(err) {}
+        }
+        function map_init_basic (id) {
+			map = L.map(id);
+			L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			}).addTo(map);
+            map.gestureHandling.enable();
+            {% if messages_number == 0 %}
+                marker = L.marker([{{ feed_lat|safe }}, {{ feed_lng|safe }}],
+                                  {draggable: true, autoPan: true});
+                marker.addTo(map);
+                marker.on('dragend', map_update_location);
+                map.on('zoomend', map_update_location);
+            {% else %}
+                marker = L.marker([{{ feed_lat|safe }}, {{ feed_lng|safe }}]).addTo(map);
+            {% endif %}
+            map.setView(marker.getLatLng(), {{ feed_location_scale }});
+            map_update_location();
+        }
+    </script>
+{% endblock %}
+
+
+{% block style %}
+    <link rel="stylesheet" href="{% static '/feed/leaflet.css' %}" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+	<link rel="stylesheet" href="{% static '/feed/leaflet-gesture-handling.min.css' %}" type="text/css">
+	<style type="text/css">
+	    #feed_map {
+		    height: 180px;
+			min-height: 60vh;
+		}
+        #qrcode {max-width: 100vh;}
+        .message {background-color: rgba(0,0,0,0.02); text-align: left; padding: 1vw}
+        .message_meta {color: rgba(0,0,0,0.5); font-size: smaller;}
+        #message_number {text-align: left;}
+        @media screen and (min-width: 0px) and (max-width: 767px) {
+          .mobile-hide { display: none; }
+        }
+        .modal {
+            width : min(90vw, 90vh);
+            height: min(90vw, 90vh);
+            margin: 10px auto;
+            background-color: #fff;
+        }
+    </style>
+{% endblock %}
+
+{% block logotitle %}
+        <div class="mui-container-fluid">
+            <div class="mui-row">
+                <div id="qrcode" class="mui-col-md-2 mobile-hide" onclick="activateQrModal()"></div>
+                <div id="title" class="mui-col-md-10">
+                    <div class="mui--text-display2">{{ feed_title }}</div>
+                    {% if messages_number >= 0 %}
+                    <a class="mui--text-light" href="" onclick="activateQrModal(); return false;" style="text-decoration: underline;">QR feed secret: <div id="feed_secret_title" style="display:inline;">{{ feed_secret }}</div></a>
+                    {% else %}
+                    <a class="mui--text-light" href="" onclick="activateQrModal(); return false;" style="text-decoration: underline;">QR feed location: <div id="feed_secret_title" style="display:inline;">{{ feed_lat|safe }}, {{ feed_lng|safe }}</div></a>
+                    {% endif %}
+
+                </div>
+             </div>
+         </div>
+        <script>
+            var modalEl = undefined;
+            function activateQrModal() {
+                // initialize QR modal element
+                if (modalEl === undefined) {
+                    modalEl = document.createElement('div');
+                    modalEl.classList.add("modal")
+                    var qr = document.getElementById("qrcode").lastChild.cloneNode(true);
+                    qr.onclick = () => { mui.overlay('off'); };
+                    modalEl.appendChild(qr)
+                }
+                // show QR modal
+                mui.overlay('on', modalEl);
+            }
+        </script>
+        <script type="text/javascript">
+            function updateQrCode() {
+                var qrcode = new QRCode({
+                  content: document.location.toString(),
+                  container: "svg-viewbox", //Responsive use
+                  join: true //Crisp rendering and 4-5x reduced file size
+                });
+                var svg = qrcode.svg();
+                document.getElementById("qrcode").innerHTML = svg;
+            }
+            updateQrCode();
+        </script>
+{% endblock %}
+
+{% block content %}
+<div class="mui-container-fluid">
+    <div class="mui-row">
+        <div class="mui-col-md-6" id="left_col">
+            {% if messages_number >= 0 %}
+            <div>
+                <form id="new_message_form" action="{% url 'feed:post' %}" method="post">
+                    <div class="mui--text-dark mui--text-display1">Leave you message:</div>
+                    {% csrf_token %}
+                    <input type="hidden" id="new_message_feed_secret" name="new_message_feed_secret" value="{{ feed_secret }}" required/><br/>
+                    {% if messages_number == 0 %}
+                    <input type="hidden" id="new_message_feed_lat" name="new_message_feed_lat" value="{{ feed_lat|safe }}" required/>
+                    <input type="hidden" id="new_message_feed_lng" name="new_message_feed_lng" value="{{ feed_lng|safe }}" required/>
+                    <input type="hidden" id="new_message_feed_scale" name="new_message_feed_scale" value="{{ feed_location_scale }}" required/>
+                    <div class="mui-textfield">
+                        <input type="text" id="new_message_feed_title" name="new_message_feed_title" placeholder="Feed title" required autofocus/>
+                        <label>Feed title</label>
+                    </div>
+                    {% endif %}
+                    <div class="mui-textfield">
+                        <textarea type="text" id="new_message_text" name="new_message_text" placeholder="Message text" maxlength="1024" onkeypress="textareaCheck(event,'new_message_form')" required autofocus/></textarea>
+                        <label>Message text</label>
+                        <script type="text/javascript">
+                            function textareaCheck(event,formId) {
+                                var keyCode = (event.keyCode) ? event.keyCode : event.which;
+                                if ((keyCode == 10 || keyCode == 13) && event.ctrlKey)
+                                {
+                                    document.getElementById(formId).submit();
+                                }
+                            }
+                        </script>
+                    </div>
+                    <input type="submit" id="new_message_btn" class="mui-btn mui-btn--primary" value="Post" />
+                </form>
+            </div>
+            <div class="height_sep"></div>
+            {% endif %}
+
+            {% if messages_number > 0 %}
+                <div>
+                <script type="text/javascript">
+                    setTimeout(() => {
+                        for (d of document.getElementsByClassName("message_publication_date")) {
+                            d.innerHTML = new Date(Number(d.innerHTML) * 1000).toLocaleString();
+                        }
+                    }, 0)
+                </script>
+                {% for message in latest_messages_list %}
+                    <div class="message mui-panel">
+                        <div class="message_body">{{ message.text }}</div>
+                        <div class="message_meta"><div class="message_publication_date" style="display:inline">{{ message.publication_date|safe }}</div></div>
+                    </div>
+                {% endfor %}
+                </div>
+            {% elif messages_number < 0 %}
+                <p>Conversation is hidden. Please visit the place to find QR secret.</p>
+            {% else %}
+                <p>Be first to post :)</p>
+            {% endif %}
+        </div>
+        <div id="right_col" class="mui-col-md-6">
+            <div id="map">
+                <div id="feed_map"></div>
+                <script type="text/javascript">
+                   map_init_basic('feed_map');
+                </script>
+            </div>
+        </div>
+        <div class="height_sep"></div>
+    </div>
+</div>
+{% endblock %}
