@@ -4,7 +4,7 @@
 
 {% block scripts %}
 	<script src="{% static '/feed/qrcode.min.js' %}" type="text/javascript"></script>
-    <script src="{% static '/feed/leaflet.js' %}" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+    <script src="{% static '/feed/leaflet.js' %}"></script>
     <script src="{% static '/feed/leaflet-gesture-handling.min.js' %}" type="text/javascript"></script>
 	<script type="text/javascript">
 		function map_init_basic (id) {
@@ -25,7 +25,7 @@
 {% endblock %}
 
 {% block style %}
-    <link rel="stylesheet" href="{% static '/feed/leaflet.css' %}" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+    <link rel="stylesheet" href="{% static '/feed/leaflet.css' %}"/>
 	<link rel="stylesheet" href="{% static '/feed/leaflet-gesture-handling.min.css' %}" type="text/css">
 
 	<style type="text/css">
